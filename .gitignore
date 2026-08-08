@@ -1,0 +1,7 @@
+/outreach
+/outreach.exe
+*.db
+*.db-wal
+*.db-shm
+*.log
+.env

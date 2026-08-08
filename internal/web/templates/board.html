@@ -1,0 +1,34 @@
+{{define "board"}}
+{{template "header" .}}
+<div class="panel">
+	<h2>New Project</h2>
+	<form method="post" action="/projects/new">
+		<div class="row">
+			<input type="text" name="name" placeholder="Project name" required>
+		</div>
+		<div style="margin-top:8px">
+			<textarea name="links" rows="2" placeholder="Links, one per line (site, twitter, docs...)"></textarea>
+		</div>
+		<div style="margin-top:8px">
+			<button type="submit">Add Project</button>
+		</div>
+	</form>
+</div>
+
+<div class="board">
+	{{range .Columns}}
+	<div class="column">
+		<h3>{{.Label}} ({{len .Projects}})</h3>
+		{{range .Projects}}
+		<a class="card" href="/projects/{{.ID}}">
+			<div class="name">{{.Name}}</div>
+			<div class="meta">updated {{.UpdatedAt.Format "Jan 2"}}</div>
+		</a>
+		{{else}}
+		<div class="muted" style="padding:8px">empty</div>
+		{{end}}
+	</div>
+	{{end}}
+</div>
+{{template "footer"}}
+{{end}}

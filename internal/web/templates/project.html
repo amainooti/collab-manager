@@ -1,0 +1,67 @@
+{{define "project"}}
+{{template "header" .}}
+<p><a href="/">&larr; board</a></p>
+
+<div class="panel">
+	<div class="row" style="justify-content:space-between;align-items:center">
+		<h2 style="margin:0;text-transform:none;font-size:20px;color:var(--text)">{{.Detail.Project.Name}}</h2>
+		<span class="badge" id="stage-badge">{{.Detail.Project.Stage}}</span>
+	</div>
+	{{if .Detail.Project.Links}}
+	<div class="muted" style="margin-top:8px;white-space:pre-line">{{.Detail.Project.Links}}</div>
+	{{end}}
+
+	<form method="post" action="/projects/{{.Detail.Project.ID}}/status" style="margin-top:14px">
+		<div class="row">
+			<select name="stage">
+				{{range .Stages}}
+				<option value="{{.}}" {{if eq . $.Detail.Project.Stage}}selected{{end}}>{{.}}</option>
+				{{end}}
+			</select>
+			<input type="text" name="notes" placeholder="notes (optional)" style="flex:1;min-width:200px">
+			<button type="submit" class="secondary">Update status</button>
+		</div>
+	</form>
+</div>
+
+<div class="panel">
+	<h2>Research Brief</h2>
+	{{template "research-panel" .}}
+</div>
+
+<div class="panel">
+	<h2>Draft a Pitch</h2>
+	<form hx-post="/projects/{{.Detail.Project.ID}}/draft" hx-target="#draft-panel" hx-swap="outerHTML">
+		<div class="row">
+			<select name="goal">
+				<option value="intro">intro</option>
+				<option value="partnership pitch">partnership pitch</option>
+				<option value="follow-up">follow-up</option>
+			</select>
+		</div>
+		<div style="margin-top:8px">
+			<textarea name="context" rows="2" placeholder="Any extra context or voice guidance (optional)"></textarea>
+		</div>
+		<div style="margin-top:8px">
+			<button type="submit">Generate draft</button>
+		</div>
+	</form>
+
+	{{template "draft-panel" .}}
+</div>
+
+<div class="panel">
+	<h2>History</h2>
+	{{if .Detail.History}}
+	<table>
+		<tr><th>Stage</th><th>Notes</th><th>When</th></tr>
+		{{range .Detail.History}}
+		<tr><td>{{.Stage}}</td><td>{{.Notes}}</td><td class="muted">{{.CreatedAt.Format "Jan 2, 2006 15:04"}}</td></tr>
+		{{end}}
+	</table>
+	{{else}}
+	<p class="muted">No history yet.</p>
+	{{end}}
+</div>
+{{template "footer"}}
+{{end}}

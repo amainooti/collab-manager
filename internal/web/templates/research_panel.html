@@ -1,0 +1,47 @@
+{{/* research-panel renders the Research Brief section for a project — one
+     of three states: a job actively running (self-polls every 2s until it
+     stops), a job that just failed, or the normal brief-or-empty view. It's
+     used both embedded in the full project page and as a standalone htmx
+     partial returned by POST .../research and GET .../research/status. */}}
+{{define "research-panel"}}
+{{if eq .ResearchJob.Status "running"}}
+<div id="research-panel" hx-get="/projects/{{.Detail.Project.ID}}/research/status" hx-trigger="every 2s" hx-swap="outerHTML">
+	<div class="progress-msg"><span class="spinner"></span><strong>Working&hellip;</strong></div>
+	<div class="progressbar"><div class="progressbar-fill"></div></div>
+	<p class="muted">{{.ResearchJob.Message}}</p>
+</div>
+{{else if eq .ResearchJob.Status "error"}}
+<div id="research-panel">
+	<p style="color:var(--danger)">Research failed: {{.ResearchJob.Err}}</p>
+	<form hx-post="/projects/{{.Detail.Project.ID}}/research" hx-target="#research-panel" hx-swap="outerHTML">
+		<button type="submit">Retry</button>
+	</form>
+</div>
+{{else}}
+<div id="research-panel">
+	{{if .Detail.Brief}}
+	{{if .Detail.Brief.Model}}<span class="badge">{{.Detail.Brief.Model}}</span>{{end}}
+	<p>{{.Detail.Brief.Summary}}</p>
+	{{if .Detail.Brief.Team}}<p><strong>Team:</strong> {{join .Detail.Brief.Team ", "}}</p>{{end}}
+	{{if .Detail.Brief.Socials}}<p><strong>Socials:</strong> {{join .Detail.Brief.Socials ", "}}</p>{{end}}
+	{{if .Detail.Brief.RecentNews}}
+	<p><strong>Recent activity:</strong></p>
+	<ul class="plain">{{range .Detail.Brief.RecentNews}}<li>{{.}}</li>{{end}}</ul>
+	{{end}}
+	{{if .Detail.Brief.Tone}}<p><strong>Tone:</strong> {{.Detail.Brief.Tone}}</p>{{end}}
+	<p class="muted">generated {{.Detail.Brief.GeneratedAt.Format "Jan 2, 2006 15:04"}} UTC
+		{{if .Detail.Brief.Sources}} · {{len .Detail.Brief.Sources}} sources{{end}}</p>
+	<form hx-post="/projects/{{.Detail.Project.ID}}/research" hx-target="#research-panel" hx-swap="outerHTML">
+		<input type="hidden" name="refresh" value="true">
+		<button type="submit" class="secondary">Re-research</button>
+	</form>
+	{{else}}
+	<p class="muted">No research yet.</p>
+	<form hx-post="/projects/{{.Detail.Project.ID}}/research" hx-target="#research-panel" hx-swap="outerHTML">
+		<button type="submit">Research this project</button>
+	</form>
+	{{end}}
+</div>
+{{end}}
+{{if .OOB}}<span id="stage-badge" class="badge" hx-swap-oob="true">{{.Detail.Project.Stage}}</span>{{end}}
+{{end}}
