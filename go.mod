@@ -4,6 +4,7 @@ go 1.26.5
 
 require (
 	github.com/anthropics/anthropic-sdk-go v1.62.0
+	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 	github.com/modelcontextprotocol/go-sdk v1.7.0
 	modernc.org/sqlite v1.56.0
 )

@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -128,6 +129,38 @@ func (s *Store) ListProjects() ([]core.Project, error) {
 		out = append(out, p)
 	}
 	return out, rows.Err()
+}
+
+// FindProjects returns projects whose name contains query, case-insensitive.
+// Used by callers that reference a project by name rather than ID (the
+// Telegram bot's /find and /research) since typing a numeric ID from
+// memory is worse UX than searching.
+func (s *Store) FindProjects(query string) ([]core.Project, error) {
+	rows, err := s.db.Query(
+		`SELECT id, name, links, stage, created_at, updated_at FROM projects WHERE name LIKE ? ESCAPE '\' ORDER BY updated_at DESC`,
+		"%"+escapeLike(query)+"%",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("find projects: %w", err)
+	}
+	defer rows.Close()
+
+	var out []core.Project
+	for rows.Next() {
+		var p core.Project
+		if err := rows.Scan(&p.ID, &p.Name, &p.Links, &p.Stage, &p.CreatedAt, &p.UpdatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+// escapeLike escapes SQL LIKE wildcards in user input so a search for
+// "50% off" or "a_b" doesn't get treated as a pattern.
+func escapeLike(s string) string {
+	r := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+	return r.Replace(s)
 }
 
 func (s *Store) UpdateStage(projectID int64, stage core.Stage, notes string) error {

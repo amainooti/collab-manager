@@ -19,6 +19,7 @@ import (
 	"outreach/internal/llmrouter"
 	"outreach/internal/mcpserver"
 	"outreach/internal/store"
+	"outreach/internal/telegram"
 	"outreach/internal/web"
 )
 
@@ -42,6 +43,8 @@ func main() {
 		runServe(svc)
 	case "mcp":
 		runMCP(svc)
+	case "bot":
+		runBot(svc)
 	default:
 		usage()
 		os.Exit(1)
@@ -104,6 +107,16 @@ func runMCP(svc *core.Service) {
 	}
 }
 
+func runBot(svc *core.Service) {
+	bot, err := telegram.New(svc)
+	if err != nil {
+		log.Fatalf("telegram bot: %v", err)
+	}
+	if err := bot.Run(context.Background()); err != nil {
+		log.Fatalf("telegram bot: %v", err)
+	}
+}
+
 func envOr(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
@@ -112,9 +125,11 @@ func envOr(key, fallback string) string {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: outreach <serve|mcp>")
+	fmt.Fprintln(os.Stderr, "usage: outreach <serve|mcp|bot>")
 	fmt.Fprintln(os.Stderr, "  serve  run the REST API + web UI (default addr :8090, override with OUTREACH_ADDR)")
 	fmt.Fprintln(os.Stderr, "  mcp    run an MCP server over stdio")
+	fmt.Fprintln(os.Stderr, "  bot    run the Telegram bot (long-polling)")
 	fmt.Fprintln(os.Stderr, "env: ANTHROPIC_API_KEY and/or HF_TOKEN (at least one required), OUTREACH_DB (default outreach.db)")
 	fmt.Fprintln(os.Stderr, "     HF_MODEL, HF_BASE_URL to customize the Hugging Face fallback")
+	fmt.Fprintln(os.Stderr, "     TELEGRAM_BOT_TOKEN, TELEGRAM_ALLOWED_USERS (comma-separated numeric user IDs) — required for `bot`")
 }

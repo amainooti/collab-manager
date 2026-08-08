@@ -1,14 +1,14 @@
 # outreach
 
 Small backend with three functions — `research`, `draft_pitch`, `update_status` —
-callable via REST or as an MCP server, backed by SQLite. A server-rendered
-kanban web UI sits on top. A Telegram bot (phase 2) would call the same
-`core.Service` the web UI and REST API already use.
+callable via REST, as an MCP server, or from Telegram, backed by SQLite. A
+server-rendered kanban web UI sits on top. All four frontends call the same
+`core.Service` — none of them know about the others.
 
 ## Layout
 
 ```
-cmd/outreach/        entrypoint: `serve` (REST + web) or `mcp` (stdio MCP server)
+cmd/outreach/        entrypoint: `serve` (REST + web), `mcp` (stdio MCP server), or `bot` (Telegram)
 internal/core/       the 3 functions + shared types — no HTTP/MCP/SQL/provider specifics
 internal/store/      SQLite persistence (modernc.org/sqlite, no cgo)
 internal/llmshared/  prompt text + JSON parsing shared by every model provider
@@ -18,6 +18,7 @@ internal/llmrouter/  tries Claude first, falls back to Hugging Face on any error
 internal/api/        REST handlers wrapping core.Service
 internal/web/        kanban board + project detail pages (html/template, no JS build)
 internal/mcpserver/  MCP tool server wrapping core.Service
+internal/telegram/   Telegram bot frontend wrapping core.Service
 ```
 
 ## Run
@@ -28,7 +29,35 @@ set -a; source .env; set +a
 
 go run ./cmd/outreach serve   # http://localhost:8090
 go run ./cmd/outreach mcp     # stdio MCP server
+go run ./cmd/outreach bot     # Telegram bot (needs TELEGRAM_BOT_TOKEN + TELEGRAM_ALLOWED_USERS)
 ```
+
+## Telegram bot
+
+Same three functions, from your phone. Setup:
+
+1. Message [@BotFather](https://t.me/BotFather) on Telegram, `/newbot`, follow the
+   prompts — you get back a token. Set it as `TELEGRAM_BOT_TOKEN`.
+2. Get your own numeric Telegram user ID (message [@userinfobot](https://t.me/userinfobot)
+   and it'll reply with it). Set it as `TELEGRAM_ALLOWED_USERS` — comma-separated if
+   more than one person should have access.
+3. **Both are required** — the bot refuses to start without an allowlist, since
+   without one anyone who finds it could spend your Claude/HF API quota.
+
+Commands:
+
+- `/list` — all projects
+- `/find <text>` — search projects by name
+- `/new <name>` — add a project
+- `/research <id or name>` — research a project; replies immediately, then again
+  when the (couple-minutes-long) research call finishes
+- `/draft <id> <goal>` — draft a pitch (`goal`: `intro` / `partnership pitch` / `follow-up`);
+  same async reply pattern as research
+- `/status <id> <stage> [notes]` — move a project's stage
+
+`/draft` and `/status` take a numeric ID specifically (not a name) since the goal/stage
+argument that follows can itself contain spaces — `/list` or `/find` first to get the ID.
+`/research` accepts either, since it only takes one argument.
 
 ## Model providers
 

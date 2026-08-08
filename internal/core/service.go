@@ -24,6 +24,7 @@ type DB interface {
 	CreateProject(name, links string) (Project, error)
 	GetProject(id int64) (Project, error)
 	ListProjects() ([]Project, error)
+	FindProjects(query string) ([]Project, error)
 	UpdateStage(projectID int64, stage Stage, notes string) error
 	SaveBrief(b Brief) error
 	GetBrief(projectID int64) (*Brief, error)
@@ -51,6 +52,18 @@ func (s *Service) CreateProject(name, links string) (Project, error) {
 
 func (s *Service) ListProjects() ([]Project, error) {
 	return s.DB.ListProjects()
+}
+
+// FindProjects searches projects by name (case-insensitive substring).
+func (s *Service) FindProjects(query string) ([]Project, error) {
+	return s.DB.FindProjects(query)
+}
+
+// GetProject fetches a single project without its brief/drafts/history —
+// callers that only need to resolve an ID to a name (e.g. the Telegram
+// bot) don't need the heavier GetProjectDetail.
+func (s *Service) GetProject(id int64) (Project, error) {
+	return s.DB.GetProject(id)
 }
 
 func (s *Service) GetProjectDetail(id int64) (ProjectDetail, error) {
