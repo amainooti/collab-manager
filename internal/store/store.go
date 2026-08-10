@@ -78,8 +78,19 @@ CREATE TABLE IF NOT EXISTS history (
 	created_at DATETIME NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS collab_notes (
+	id         INTEGER PRIMARY KEY AUTOINCREMENT,
+	project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+	mode       TEXT NOT NULL,
+	input      TEXT NOT NULL DEFAULT '',
+	content    TEXT NOT NULL,
+	model      TEXT NOT NULL DEFAULT '',
+	created_at DATETIME NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_drafts_project ON drafts(project_id);
 CREATE INDEX IF NOT EXISTS idx_history_project ON history(project_id);
+CREATE INDEX IF NOT EXISTS idx_collab_notes_project ON collab_notes(project_id);
 `)
 	return err
 }
@@ -285,6 +296,47 @@ func (s *Store) ListDrafts(projectID int64) ([]core.Draft, error) {
 			return nil, err
 		}
 		out = append(out, d)
+	}
+	return out, rows.Err()
+}
+
+// --- Collab notes ---
+
+func (s *Store) SaveCollabNote(projectID int64, mode core.CollabMode, input, content, model string) (core.CollabNote, error) {
+	now := time.Now().UTC()
+	res, err := s.db.Exec(
+		`INSERT INTO collab_notes (project_id, mode, input, content, model, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		projectID, mode, input, content, model, now,
+	)
+	if err != nil {
+		return core.CollabNote{}, fmt.Errorf("save collab note: %w", err)
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return core.CollabNote{}, err
+	}
+	return core.CollabNote{
+		ID: id, ProjectID: projectID, Mode: mode, Input: input, Content: content, Model: model, CreatedAt: now,
+	}, nil
+}
+
+func (s *Store) ListCollabNotes(projectID int64) ([]core.CollabNote, error) {
+	rows, err := s.db.Query(
+		`SELECT id, project_id, mode, input, content, model, created_at FROM collab_notes WHERE project_id = ? ORDER BY created_at DESC`,
+		projectID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list collab notes: %w", err)
+	}
+	defer rows.Close()
+
+	var out []core.CollabNote
+	for rows.Next() {
+		var n core.CollabNote
+		if err := rows.Scan(&n.ID, &n.ProjectID, &n.Mode, &n.Input, &n.Content, &n.Model, &n.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, n)
 	}
 	return out, rows.Err()
 }

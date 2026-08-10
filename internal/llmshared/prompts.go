@@ -154,3 +154,75 @@ func DraftUserPrompt(projectName string, brief core.Brief, goal, extraContext st
 	fmt.Fprintf(&b, "\nDraft the message now.")
 	return b.String()
 }
+
+// collabBase is shared context across every CollabSystemPrompt mode: who the
+// user is and the standing rule to ground output in the research brief
+// rather than asking generic questions any journalist could ask about any
+// protocol.
+const collabBase = "You are helping a crypto/Web3 journalist prepare for and run a live collaboration " +
+	"meeting or call with a protocol team. Ground everything in the research brief provided — specific, " +
+	"verifiable details (a recent launch, a funding round, a technical claim, a team member's background) " +
+	"make for sharper prep than generic questions any journalist could ask about any protocol. "
+
+// CollabSystemPrompt returns the system prompt for one moment of a
+// collaboration meeting. Distinct from DraftSystemPrompt because the output
+// shape is different: spoken prep material and question lists the
+// journalist uses live on a call, not a send-ready written message.
+func CollabSystemPrompt(mode core.CollabMode) string {
+	switch mode {
+	case core.CollabIntro:
+		return collabBase + "Write a short spoken introduction the journalist can say at the top of the call " +
+			"(not an email): who they are, what they're working on, why they're specifically interested in " +
+			"talking to this team (referencing something concrete from the brief), and what they're hoping to " +
+			"get out of the conversation. 3-5 sentences, natural spoken language, no bullet points, no subject " +
+			"line. Output only the intro text."
+	case core.CollabQuestions:
+		return collabBase + "Produce a numbered list of 8-12 questions for the call, grouped under short " +
+			"headers (e.g. 'Background', 'Technical', 'Roadmap & Funding', 'Hard questions'). Draw on the " +
+			"brief's specifics so questions are concrete, not generic. Include a couple of easy warm-up " +
+			"questions, several substantive ones likely to produce good story material, and at least one or " +
+			"two pointed/critical questions a credible journalist should ask (e.g. about a claim that sounds " +
+			"unverified, a past controversy, or a gap between what they say publicly and what the brief shows). " +
+			"Output only the list, no preamble."
+	case core.CollabFollowUp:
+		return collabBase + "The user will paste in notes or a transcript from the conversation so far, under " +
+			"'Conversation so far' below. Read it closely and produce a numbered list of 4-8 follow-up " +
+			"questions that build on what was actually said: chase vague, evasive, or incomplete answers, " +
+			"press on anything mentioned but not explained, and ask about any obvious gaps between the " +
+			"conversation and the research brief. Do not repeat ground already covered in the pasted notes. If " +
+			"the pasted notes don't give enough to react to, say so briefly and fall back to the strongest " +
+			"unanswered questions from the brief instead. Output only the list."
+	case core.CollabClosing:
+		return collabBase + "Write a short spoken closing the journalist can say to end the call (not an " +
+			"email): thank the team for their time, briefly confirm next steps (e.g. any materials they said " +
+			"they'd send, embargo or publish timing if it came up, who to follow up with), and leave the door " +
+			"open for future collaboration. 3-5 sentences, natural spoken language, no bullet points. Output " +
+			"only the closing text."
+	default:
+		return collabBase
+	}
+}
+
+// CollabUserPrompt assembles the brief and, when present, pasted
+// conversation notes into the user turn for a collab-prep call.
+func CollabUserPrompt(projectName string, brief core.Brief, conversationContext string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Project: %s\n\n", projectName)
+	if brief.Summary != "" {
+		fmt.Fprintf(&b, "What they do: %s\n", brief.Summary)
+	}
+	if len(brief.Team) > 0 {
+		fmt.Fprintf(&b, "Team: %s\n", strings.Join(brief.Team, ", "))
+	}
+	if len(brief.RecentNews) > 0 {
+		fmt.Fprintf(&b, "Recent activity: %s\n", strings.Join(brief.RecentNews, "; "))
+	}
+	if brief.Tone != "" {
+		fmt.Fprintf(&b, "Their public tone: %s\n", brief.Tone)
+	}
+	if strings.TrimSpace(conversationContext) != "" {
+		fmt.Fprintf(&b, "\nConversation so far (pasted by the user):\n%s\n", conversationContext)
+	}
+	fmt.Fprintf(&b, "\nGenerate the requested content now.")
+	return b.String()
+}

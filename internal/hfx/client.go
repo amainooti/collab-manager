@@ -120,6 +120,19 @@ func (c *Client) DraftPitch(ctx context.Context, projectName string, brief core.
 	return content, c.ModelID(), nil
 }
 
+// GenerateCollab mirrors the Claude implementation using the same collab
+// prompts from internal/llmshared.
+func (c *Client) GenerateCollab(ctx context.Context, projectName string, brief core.Brief, mode core.CollabMode, conversationContext string) (string, string, error) {
+	if !c.Configured() {
+		return "", "", fmt.Errorf("hfx: HF_TOKEN not set")
+	}
+	content, err := c.complete(ctx, llmshared.CollabSystemPrompt(mode), llmshared.CollabUserPrompt(projectName, brief, conversationContext), 1200)
+	if err != nil {
+		return "", "", err
+	}
+	return content, c.ModelID(), nil
+}
+
 type chatMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`

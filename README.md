@@ -1,9 +1,15 @@
 # outreach
 
-Small backend with three functions — `research`, `draft_pitch`, `update_status` —
-callable via REST, as an MCP server, or from Telegram, backed by SQLite. A
-server-rendered kanban web UI sits on top. All four frontends call the same
-`core.Service` — none of them know about the others.
+Backend for crypto/Web3 journalists doing protocol outreach and collaborations —
+`research`, `draft_pitch`, `generate_collab`, `update_status` — callable via REST,
+as an MCP server, or from Telegram, backed by SQLite. A server-rendered kanban web
+UI sits on top. All four frontends call the same `core.Service` — none of them know
+about the others.
+
+`generate_collab` is the collab-meeting manager: once a project has a research
+brief, it produces a spoken intro, a research-grounded question list, follow-up
+questions reacting to conversation notes/a transcript pasted in after the call
+starts, and a closing — the four moments of an actual call with a protocol team.
 
 ## Layout
 
@@ -53,11 +59,15 @@ Commands:
   when the (couple-minutes-long) research call finishes
 - `/draft <id> <goal>` — draft a pitch (`goal`: `intro` / `partnership pitch` / `follow-up`);
   same async reply pattern as research
+- `/collab <id> <mode>` — generate collab-meeting prep (`mode`: `intro` / `questions` /
+  `follow_up` / `closing`). For `follow_up`, the bot asks you to paste the
+  conversation/transcript as your next message (Telegram command arguments don't handle
+  multi-line pasted text well) and generates follow-up questions from it.
 - `/status <id> <stage> [notes]` — move a project's stage
 
-`/draft` and `/status` take a numeric ID specifically (not a name) since the goal/stage
-argument that follows can itself contain spaces — `/list` or `/find` first to get the ID.
-`/research` accepts either, since it only takes one argument.
+`/draft`, `/collab`, and `/status` take a numeric ID specifically (not a name) since the
+goal/mode/stage argument that follows can itself contain spaces — `/list` or `/find` first
+to get the ID. `/research` accepts either, since it only takes one argument.
 
 ## Model providers
 
@@ -86,6 +96,8 @@ the request outright.
 - `GET  /api/projects/{id}`                    full detail: project + brief + drafts + history
 - `POST /api/projects/{id}/research`           `{refresh: bool}` — cached unless refresh
 - `POST /api/projects/{id}/draft`              `{goal, context}`
+- `POST /api/projects/{id}/collab`             `{mode, context}` — `mode`: `intro` / `questions` / `follow_up` / `closing`;
+  `context` is the pasted conversation/transcript, used by `follow_up`
 - `POST /api/projects/{id}/status`             `{stage, notes}`
 
 ## Notes

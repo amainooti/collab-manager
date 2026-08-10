@@ -72,3 +72,24 @@ func (r *Router) DraftPitch(ctx context.Context, projectName string, brief core.
 	}
 	return content, model, nil
 }
+
+func (r *Router) GenerateCollab(ctx context.Context, projectName string, brief core.Brief, mode core.CollabMode, conversationContext string) (string, string, error) {
+	if r.primary != nil {
+		content, model, err := r.primary.GenerateCollab(ctx, projectName, brief, mode, conversationContext)
+		if err == nil {
+			return content, model, nil
+		}
+		if r.fallback == nil {
+			return "", "", err
+		}
+		log.Printf("llmrouter: primary collab generation failed (%v), falling back", err)
+	}
+	if r.fallback == nil {
+		return "", "", errNoProvider
+	}
+	content, model, err := r.fallback.GenerateCollab(ctx, projectName, brief, mode, conversationContext)
+	if err != nil {
+		return "", "", fmt.Errorf("fallback also failed: %w", err)
+	}
+	return content, model, nil
+}

@@ -1,0 +1,36 @@
+{{/* collab-panel renders the collab-prep notes list below the "Generate"
+     form — same three-state shape as draft-panel (running/error/normal).
+     The form itself lives outside this partial in project.html so the mode
+     select and pasted conversation stay visible while a previous
+     generation is still running. */}}
+{{define "collab-panel"}}
+{{if eq .CollabJob.Status "running"}}
+<div id="collab-panel" hx-get="/projects/{{.Detail.Project.ID}}/collab/status" hx-trigger="every 2s" hx-swap="outerHTML">
+	<div class="progress-msg"><span class="spinner"></span><strong>Working&hellip;</strong></div>
+	<div class="progressbar"><div class="progressbar-fill"></div></div>
+	<p class="muted">{{.CollabJob.Message}}</p>
+</div>
+{{else if eq .CollabJob.Status "error"}}
+<div id="collab-panel">
+	<p style="color:var(--danger)">Generation failed: {{.CollabJob.Err}}</p>
+</div>
+{{else}}
+<div id="collab-panel">
+	{{range .Detail.CollabNotes}}
+	<div class="draft">
+		<div class="row" style="justify-content:space-between">
+			<span class="row" style="gap:6px">
+				<span class="badge">{{.Mode}}</span>
+				{{if .Model}}<span class="badge">{{.Model}}</span>{{end}}
+			</span>
+			<span class="muted">{{.CreatedAt.Format "Jan 2, 2006 15:04"}} UTC</span>
+		</div>
+		{{if .Input}}<p class="muted" style="margin:6px 0 0">pasted conversation used as context</p>{{end}}
+		<textarea readonly rows="10" onclick="this.select()">{{.Content}}</textarea>
+	</div>
+	{{else}}
+	<p class="muted">No collab prep generated yet.</p>
+	{{end}}
+</div>
+{{end}}
+{{end}}

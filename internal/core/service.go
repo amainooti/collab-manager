@@ -17,6 +17,12 @@ import (
 type LLM interface {
 	ResearchProject(ctx context.Context, name, links string) (Brief, error)
 	DraftPitch(ctx context.Context, projectName string, brief Brief, goal, extraContext string) (content, model string, err error)
+
+	// GenerateCollab produces prep material for one moment of a collaboration
+	// meeting (see CollabMode) from a project's research brief and, for
+	// CollabFollowUp, whatever conversation notes/transcript the caller
+	// pasted in via conversationContext.
+	GenerateCollab(ctx context.Context, projectName string, brief Brief, mode CollabMode, conversationContext string) (content, model string, err error)
 }
 
 // DB is the interface store.Store satisfies.
@@ -30,6 +36,8 @@ type DB interface {
 	GetBrief(projectID int64) (*Brief, error)
 	SaveDraft(projectID int64, goal, content, model string) (Draft, error)
 	ListDrafts(projectID int64) ([]Draft, error)
+	SaveCollabNote(projectID int64, mode CollabMode, input, content, model string) (CollabNote, error)
+	ListCollabNotes(projectID int64) ([]CollabNote, error)
 	ListHistory(projectID int64) ([]HistoryEntry, error)
 }
 
@@ -79,11 +87,15 @@ func (s *Service) GetProjectDetail(id int64) (ProjectDetail, error) {
 	if err != nil {
 		return ProjectDetail{}, err
 	}
+	collabNotes, err := s.DB.ListCollabNotes(id)
+	if err != nil {
+		return ProjectDetail{}, err
+	}
 	history, err := s.DB.ListHistory(id)
 	if err != nil {
 		return ProjectDetail{}, err
 	}
-	return ProjectDetail{Project: p, Brief: brief, Drafts: drafts, History: history}, nil
+	return ProjectDetail{Project: p, Brief: brief, Drafts: drafts, CollabNotes: collabNotes, History: history}, nil
 }
 
 // Research pulls what a project does, team/socials, recent activity, and
@@ -153,6 +165,42 @@ func (s *Service) DraftPitch(ctx context.Context, projectID int64, goal, extraCo
 	return s.DB.SaveDraft(projectID, goal, content, model)
 }
 
+// GenerateCollab produces one piece of collaboration-meeting prep — an
+// intro, a research-grounded question list, a follow-up reacting to pasted
+// conversation notes, or a closing — using the cached brief (researching
+// first if one doesn't exist yet, same as DraftPitch). conversationContext
+// is meaningful for CollabFollowUp (paste in notes/a transcript from the
+// meeting so far) and optional for the other modes.
+func (s *Service) GenerateCollab(ctx context.Context, projectID int64, mode CollabMode, conversationContext string) (CollabNote, error) {
+	if err := validateCollabMode(mode); err != nil {
+		return CollabNote{}, err
+	}
+
+	p, err := s.DB.GetProject(projectID)
+	if err != nil {
+		return CollabNote{}, err
+	}
+
+	brief, err := s.DB.GetBrief(projectID)
+	if err != nil {
+		return CollabNote{}, err
+	}
+	if brief == nil {
+		researched, err := s.Research(ctx, projectID, false)
+		if err != nil {
+			return CollabNote{}, fmt.Errorf("auto-research before collab prep: %w", err)
+		}
+		brief = &researched
+	}
+
+	content, model, err := s.LLM.GenerateCollab(ctx, p.Name, *brief, mode, conversationContext)
+	if err != nil {
+		return CollabNote{}, fmt.Errorf("generate %s for %s: %w", mode, p.Name, err)
+	}
+
+	return s.DB.SaveCollabNote(projectID, mode, conversationContext, content, model)
+}
+
 // UpdateStatus moves a project to a new stage and logs a history entry.
 // Notes may be empty.
 func (s *Service) UpdateStatus(projectID int64, stage Stage, notes string) error {
@@ -169,4 +217,13 @@ func validateStage(stage Stage) error {
 		}
 	}
 	return fmt.Errorf("invalid stage %q", stage)
+}
+
+func validateCollabMode(mode CollabMode) error {
+	for _, m := range AllCollabModes {
+		if m == mode {
+			return nil
+		}
+	}
+	return fmt.Errorf("invalid collab mode %q", mode)
 }

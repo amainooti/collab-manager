@@ -26,6 +26,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/projects/{id}", a.getProject)
 	mux.HandleFunc("POST /api/projects/{id}/research", a.research)
 	mux.HandleFunc("POST /api/projects/{id}/draft", a.draft)
+	mux.HandleFunc("POST /api/projects/{id}/collab", a.collab)
 	mux.HandleFunc("POST /api/projects/{id}/status", a.updateStatus)
 }
 
@@ -117,6 +118,33 @@ func (a *API) draft(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, draft)
+}
+
+func (a *API) collab(w http.ResponseWriter, r *http.Request) {
+	id, err := idParam(r)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	var body struct {
+		Mode    string `json:"mode"`
+		Context string `json:"context"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	if body.Mode == "" {
+		writeErr(w, http.StatusBadRequest, errBadRequest("mode is required"))
+		return
+	}
+
+	note, err := a.svc.GenerateCollab(r.Context(), id, core.CollabMode(body.Mode), body.Context)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, note)
 }
 
 func (a *API) updateStatus(w http.ResponseWriter, r *http.Request) {

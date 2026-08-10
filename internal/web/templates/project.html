@@ -51,6 +51,32 @@
 </div>
 
 <div class="panel">
+	<h2>Collab Prep</h2>
+	<p class="muted" style="margin-top:0">
+		Generate an intro, a research-grounded question list, a closing — or paste in notes/a transcript from the
+		call so far and generate follow-up questions that react to what was actually said.
+	</p>
+	<form hx-post="/projects/{{.Detail.Project.ID}}/collab" hx-target="#collab-panel" hx-swap="outerHTML">
+		<div class="row">
+			<select name="mode">
+				<option value="intro">intro</option>
+				<option value="questions">questions</option>
+				<option value="follow_up">follow-up (uses pasted conversation below)</option>
+				<option value="closing">closing</option>
+			</select>
+		</div>
+		<div style="margin-top:8px">
+			<textarea name="conversation" rows="4" placeholder="Paste conversation notes or a transcript here (used for follow-up)"></textarea>
+		</div>
+		<div style="margin-top:8px">
+			<button type="submit">Generate</button>
+		</div>
+	</form>
+
+	{{template "collab-panel" .}}
+</div>
+
+<div class="panel">
 	<h2>History</h2>
 	{{if .Detail.History}}
 	<table>

@@ -163,3 +163,30 @@ func (c *Client) DraftPitch(ctx context.Context, projectName string, brief core.
 	}
 	return strings.TrimSpace(out.String()), DraftModel, nil
 }
+
+// GenerateCollab produces one piece of collaboration-meeting prep (intro,
+// question list, follow-up, or closing) from a research brief and, for
+// CollabFollowUp, pasted conversation notes.
+func (c *Client) GenerateCollab(ctx context.Context, projectName string, brief core.Brief, mode core.CollabMode, conversationContext string) (string, string, error) {
+	system := []anthropic.TextBlockParam{{Text: llmshared.CollabSystemPrompt(mode)}}
+
+	resp, err := c.api.Messages.New(ctx, anthropic.MessageNewParams{
+		Model:     DraftModel,
+		MaxTokens: 2000,
+		System:    system,
+		Messages: []anthropic.MessageParam{
+			anthropic.NewUserMessage(anthropic.NewTextBlock(llmshared.CollabUserPrompt(projectName, brief, conversationContext))),
+		},
+	})
+	if err != nil {
+		return "", "", err
+	}
+
+	var out strings.Builder
+	for _, block := range resp.Content {
+		if v, ok := block.AsAny().(anthropic.TextBlock); ok {
+			out.WriteString(v.Text)
+		}
+	}
+	return strings.TrimSpace(out.String()), DraftModel, nil
+}

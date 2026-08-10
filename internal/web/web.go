@@ -46,6 +46,8 @@ func (h *Web) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /projects/{id}/research/status", h.researchStatus)
 	mux.HandleFunc("POST /projects/{id}/draft", h.startDraft)
 	mux.HandleFunc("GET /projects/{id}/draft/status", h.draftStatus)
+	mux.HandleFunc("POST /projects/{id}/collab", h.startCollab)
+	mux.HandleFunc("GET /projects/{id}/collab/status", h.collabStatus)
 	mux.HandleFunc("POST /projects/{id}/status", h.updateStatus)
 }
 
@@ -99,8 +101,10 @@ type pageData struct {
 	Title       string
 	Detail      core.ProjectDetail
 	Stages      []core.Stage
+	CollabModes []core.CollabMode
 	ResearchJob jobs.State
 	DraftJob    jobs.State
+	CollabJob   jobs.State
 	// OOB is true only when research-panel is rendered as a standalone htmx
 	// response (not embedded in the full page) — it tells the template to
 	// also emit an out-of-band update for the stage badge in the page
@@ -121,8 +125,10 @@ func (h *Web) loadPageData(id int64) (pageData, error) {
 		Title:       detail.Project.Name + " — Outreach Engine",
 		Detail:      detail,
 		Stages:      core.AllStages,
+		CollabModes: core.AllCollabModes,
 		ResearchJob: h.jobs.Get(researchKey(id)),
 		DraftJob:    h.jobs.Get(draftKey(id)),
+		CollabJob:   h.jobs.Get(collabKey(id)),
 	}, nil
 }
 
@@ -142,6 +148,7 @@ func (h *Web) projectDetail(w http.ResponseWriter, r *http.Request) {
 
 func researchKey(id int64) string { return fmt.Sprintf("research:%d", id) }
 func draftKey(id int64) string    { return fmt.Sprintf("draft:%d", id) }
+func collabKey(id int64) string   { return fmt.Sprintf("collab:%d", id) }
 
 // startResearch kicks off research in a background goroutine (detached
 // from the request's context — the HTTP response returns almost
@@ -268,6 +275,72 @@ func (h *Web) renderDraftPanel(w http.ResponseWriter, id int64) {
 	}
 	data.DraftJob = job
 	h.render(w, "draft-panel", data)
+}
+
+// startCollab kicks off collab-prep generation (intro/questions/follow_up/
+// closing) in a background goroutine, same pattern as startDraft — the
+// pasted "conversation" field only matters for follow_up but is harmless to
+// send along for the other modes since GenerateCollab only uses it there.
+func (h *Web) startCollab(w http.ResponseWriter, r *http.Request) {
+	id, err := idParam(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	mode := core.CollabMode(r.FormValue("mode"))
+	conversation := r.FormValue("conversation")
+	if mode == "" {
+		http.Error(w, "mode is required", http.StatusBadRequest)
+		return
+	}
+
+	data, err := h.loadPageData(id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	key := collabKey(id)
+	msg := fmt.Sprintf("Generating %s for %s...", strings.ReplaceAll(string(mode), "_", " "), data.Detail.Project.Name)
+	if h.jobs.Start(key, msg) {
+		go func() {
+			if _, err := h.svc.GenerateCollab(context.Background(), id, mode, conversation); err != nil {
+				h.jobs.Fail(key, err)
+			} else {
+				h.jobs.Finish(key)
+			}
+		}()
+	}
+
+	h.renderCollabPanel(w, id)
+}
+
+func (h *Web) collabStatus(w http.ResponseWriter, r *http.Request) {
+	id, err := idParam(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	h.renderCollabPanel(w, id)
+}
+
+func (h *Web) renderCollabPanel(w http.ResponseWriter, id int64) {
+	key := collabKey(id)
+	job := h.jobs.Get(key)
+	if job.Status == jobs.StatusDone || job.Status == jobs.StatusError {
+		h.jobs.Clear(key)
+	}
+	data, err := h.loadPageData(id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	data.CollabJob = job
+	h.render(w, "collab-panel", data)
 }
 
 func (h *Web) updateStatus(w http.ResponseWriter, r *http.Request) {
