@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go build *)",
+      "Bash(go vet *)",
+      "Bash(gofmt -l .)",
+      "Bash(grep -ri \"vps\" -r \"/c/Users/HP/Documents/dev/outreach\" --include=\"*.md\" --include=\"*.sh\" --include=\"*.yml\" --include=\"*.yaml\" 2>/dev/null; echo \"---\"; ls -la \"/c/Users/HP/Documents/dev/outreach\" | head -30; echo \"---ssh config---\"; cat ~/.ssh/config 2>/dev/null)",
+      "Read(//c/Users/HP/.ssh/**)",
+      "Bash(ssh -o BatchMode=yes -o ConnectTimeout=10 vps \"whoami; echo '---'; find / -maxdepth 4 -iname '*outreach*' -o -iname '*collab-manager*' 2>/dev/null; echo '---systemd---'; systemctl list-units --type=service --all 2>/dev/null | grep -i outreach; echo '---docker---'; command -v docker >/dev/null && docker ps -a 2>/dev/null | grep -i outreach; echo '---done---'\")",
+      "Bash(ssh vps *)"
+    ]
+  }
+}
